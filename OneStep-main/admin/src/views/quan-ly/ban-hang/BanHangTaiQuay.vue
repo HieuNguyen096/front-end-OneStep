@@ -12,9 +12,19 @@
             </v-chip>
           </div>
         </div>
-        <div class="text-right">
-          <div class="text-h5 font-weight-bold">{{ formatCurrency(totalAmount) }}</div>
-          <div class="text-caption">Tổng thanh toán</div>
+        <div class="text-right d-flex align-center">
+          <div class="mr-3">
+            <div class="text-h5 font-weight-bold">{{ formatCurrency(totalAmount) }}</div>
+            <div class="text-caption">Tổng thanh toán</div>
+          </div>
+          <v-btn v-if="!orderStarted" color="white" text-color="primary" variant="elevated" class="action-btn" @click="startNewOrder">
+            <v-icon class="mr-1">mdi-file-plus</v-icon>
+            Tạo hóa đơn
+          </v-btn>
+          <v-btn v-else color="error" variant="elevated" class="action-btn" @click="cancelOrder">
+            <v-icon class="mr-1">mdi-close-circle</v-icon>
+            Hủy hóa đơn
+          </v-btn>
         </div>
       </div>
     </v-card>
@@ -35,10 +45,11 @@
                 prepend-inner-icon="mdi-magnify"
                 clearable
                 @input="searchProducts"
+                :disabled="!orderStarted"
               ></v-text-field>
             </v-col>
             <v-col cols="4">
-              <v-btn color="primary" variant="elevated" size="large" block @click="showProductModal = true" class="action-btn">
+              <v-btn color="primary" variant="elevated" size="large" block @click="showProductModal = true" class="action-btn" :disabled="!orderStarted">
                 <v-icon class="mr-2">mdi-plus</v-icon>
                 Chọn sản phẩm
               </v-btn>
@@ -72,7 +83,7 @@
               <span class="text-h6 font-weight-bold">Giỏ hàng</span>
               <v-chip color="primary" class="ml-2">{{ cartItems.length }} sản phẩm</v-chip>
             </div>
-            <v-btn color="error" variant="elevated" size="small" @click="clearCart" :disabled="cartItems.length === 0" class="action-btn">
+            <v-btn color="error" variant="elevated" size="small" @click="clearCart" :disabled="cartItems.length === 0 || !orderStarted" class="action-btn">
               <v-icon size="small" class="mr-1">mdi-delete-sweep</v-icon>
               Xóa tất cả
             </v-btn>
@@ -87,11 +98,11 @@
 
             <template #item.soLuong="{ item }">
               <div class="quantity-controls">
-                <v-btn size="small" variant="elevated" color="error" @click="decreaseQuantity(item)" :disabled="item.soLuong <= 1" class="quantity-btn minus-btn">
+                <v-btn size="small" variant="elevated" color="error" @click="decreaseQuantity(item)" :disabled="item.soLuong <= 1 || !orderStarted" class="quantity-btn minus-btn">
                   <span class="quantity-symbol">−</span>
                 </v-btn>
-                <v-text-field v-model.number="item.soLuong" type="number" min="1" variant="outlined" density="compact" hide-details class="quantity-input" @change="updateQuantity(item)"></v-text-field>
-                <v-btn size="small" variant="elevated" color="success" @click="increaseQuantity(item)" class="quantity-btn plus-btn">
+                <v-text-field v-model.number="item.soLuong" type="number" min="1" variant="outlined" density="compact" hide-details class="quantity-input" @change="updateQuantity(item)" :disabled="!orderStarted"></v-text-field>
+                <v-btn size="small" variant="elevated" color="success" @click="increaseQuantity(item)" class="quantity-btn plus-btn" :disabled="!orderStarted">
                   <span class="quantity-symbol">+</span>
                 </v-btn>
               </div>
@@ -110,7 +121,7 @@
             </template>
 
             <template #item.thaoTac="{ item }">
-              <v-btn color="error" variant="elevated" size="small" @click="removeFromCart(item)" class="action-btn">
+              <v-btn color="error" variant="elevated" size="small" @click="removeFromCart(item)" class="action-btn" :disabled="!orderStarted">
                 <v-icon size="small" class="mr-1">mdi-delete</v-icon>
                 Xóa
               </v-btn>
@@ -127,24 +138,36 @@
           </v-card-title>
 
           <div class="mb-4">
-            <v-label class="text-subtitle-2 font-weight-medium mb-2">Thông tin khách hàng</v-label>
-            <v-text-field v-model="customerInfo.ten" label="Tên khách hàng" variant="outlined" density="compact" class="mb-2"></v-text-field>
-            <v-text-field v-model="customerInfo.sdt" label="Số điện thoại" variant="outlined" density="compact"></v-text-field>
+            <div class="mt-2 d-flex">
+              <v-btn color="primary" variant="elevated" size="small" class="action-btn" @click="openCustomerDialog" :disabled="!orderStarted">
+                <v-icon size="small" class="mr-1">mdi-account-search</v-icon>
+                Chọn khách hàng
+              </v-btn>
+              <v-btn color="success" variant="elevated" size="small" class="action-btn ml-2" @click="openQuickAddCustomer" :disabled="!orderStarted">
+                <v-icon size="small" class="mr-1">mdi-account-plus</v-icon>
+                Thêm KH nhanh
+              </v-btn>
+            </div>
+            <div v-if="selectedCustomer" class="mt-2">
+              <v-chip color="primary" variant="tonal" size="small">
+                {{ selectedCustomer.hoTen }} - {{ selectedCustomer.soDienThoai }}
+              </v-chip>
+            </div>
           </div>
 
           <div class="mb-4">
-            <v-switch v-model="isDelivery" label="Giao hàng" color="primary" hide-details class="mb-2"></v-switch>
+            <v-switch v-model="isDelivery" label="Giao hàng" color="primary" hide-details class="mb-2" :disabled="!orderStarted"></v-switch>
 
             <div v-if="isDelivery" class="mt-3">
               <v-label class="text-subtitle-2 font-weight-medium mb-2">Địa chỉ giao hàng</v-label>
 
-              <v-select v-model="selectedProvince" :items="provinces" item-title="name" item-value="code" label="Tỉnh/Thành phố" variant="outlined" density="compact" class="mb-2" @update:model-value="onProvinceChange" clearable prepend-inner-icon="mdi-map-marker" :loading="isLoadingProvinces"></v-select>
+              <v-select v-model="selectedProvince" :items="provinces" item-title="name" item-value="code" label="Tỉnh/Thành phố" variant="outlined" density="compact" class="mb-2" @update:model-value="onProvinceChange" clearable prepend-inner-icon="mdi-map-marker" :loading="isLoadingProvinces" :disabled="!orderStarted"></v-select>
 
-              <v-select v-model="selectedDistrict" :items="districts" item-title="name" item-value="code" label="Quận/Huyện" variant="outlined" density="compact" class="mb-2" @update:model-value="onDistrictChange" :disabled="!selectedProvince" clearable prepend-inner-icon="mdi-city" :loading="isLoadingDistricts"></v-select>
+              <v-select v-model="selectedDistrict" :items="districts" item-title="name" item-value="code" label="Quận/Huyện" variant="outlined" density="compact" class="mb-2" @update:model-value="onDistrictChange" :disabled="!selectedProvince || !orderStarted" clearable prepend-inner-icon="mdi-city" :loading="isLoadingDistricts"></v-select>
 
-              <v-select v-model="selectedWard" :items="wards" item-title="name" item-value="code" label="Phường/Xã" variant="outlined" density="compact" class="mb-2" :disabled="!selectedDistrict" clearable prepend-inner-icon="mdi-home" :loading="isLoadingWards"></v-select>
+              <v-select v-model="selectedWard" :items="wards" item-title="name" item-value="code" label="Phường/Xã" variant="outlined" density="compact" class="mb-2" :disabled="!selectedDistrict || !orderStarted" clearable prepend-inner-icon="mdi-home" :loading="isLoadingWards"></v-select>
 
-              <v-textarea v-model="detailAddress" label="Địa chỉ chi tiết (số nhà, tên đường...)" variant="outlined" density="compact" rows="2" :rules="detailAddressRules" placeholder="Ví dụ: Số 123, Đường ABC, Tòa nhà XYZ"></v-textarea>
+              <v-textarea v-model="detailAddress" label="Địa chỉ chi tiết (số nhà, tên đường...)" variant="outlined" density="compact" rows="2" :rules="detailAddressRules" placeholder="Ví dụ: Số 123, Đường ABC, Tòa nhà XYZ" :disabled="!orderStarted"></v-textarea>
 
               <div v-if="fullAddress" class="address-preview">
                 <div class="d-flex align-center mb-1">
@@ -171,10 +194,10 @@
             <v-label class="text-subtitle-2 font-weight-medium mb-2">Mã giảm giá</v-label>
             <v-row>
               <v-col cols="8">
-                <v-text-field v-model="discountCode" placeholder="Nhập mã giảm giá" variant="outlined" density="compact" hide-details></v-text-field>
+                <v-text-field v-model="discountCode" placeholder="Nhập mã giảm giá" variant="outlined" density="compact" hide-details :disabled="!orderStarted"></v-text-field>
               </v-col>
               <v-col cols="4">
-                <v-btn color="primary" variant="elevated" block @click="applyDiscount" class="action-btn">Áp dụng</v-btn>
+                <v-btn color="primary" variant="elevated" block @click="applyDiscount" class="action-btn" :disabled="!orderStarted">Áp dụng</v-btn>
               </v-col>
             </v-row>
             <div v-if="discountInfo" class="mt-2">
@@ -219,11 +242,11 @@
           <div class="mb-4">
             <v-label class="text-subtitle-2 font-weight-medium mb-2">Phương thức thanh toán</v-label>
             <v-btn-toggle v-model="paymentMethod" color="primary" variant="outlined" mandatory class="d-flex">
-              <v-btn value="cash" size="small" class="flex-grow-1">
+              <v-btn value="cash" size="small" class="flex-grow-1" :disabled="!orderStarted">
                 <v-icon class="mr-1">mdi-cash</v-icon>
                 Tiền mặt
               </v-btn>
-              <v-btn value="bank" size="small" class="flex-grow-1">
+              <v-btn value="bank" size="small" class="flex-grow-1" :disabled="!orderStarted">
                 <v-icon class="mr-1">mdi-bank</v-icon>
                 Chuyển khoản
               </v-btn>
@@ -240,12 +263,12 @@
             </v-card>
           </div>
 
-          <v-btn color="primary" variant="elevated" size="large" block class="text-h6 font-weight-bold mb-2 action-btn" @click="processPayment" :disabled="cartItems.length === 0">
+          <v-btn color="primary" variant="elevated" size="large" block class="text-h6 font-weight-bold mb-2 action-btn" @click="processPayment" :disabled="cartItems.length === 0 || !orderStarted">
             <v-icon class="mr-2">mdi-check</v-icon>
             Xác nhận thanh toán
           </v-btn>
 
-          <v-btn color="success" variant="elevated" size="large" block @click="printReceipt" :disabled="cartItems.length === 0" class="action-btn">
+          <v-btn color="success" variant="elevated" size="large" block @click="printReceipt" :disabled="cartItems.length === 0 || !orderStarted" class="action-btn">
             <v-icon class="mr-2">mdi-printer</v-icon>
             In hóa đơn
           </v-btn>
@@ -283,18 +306,77 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Dialog chọn khách hàng -->
+    <v-dialog v-model="showCustomerModal" max-width="900px">
+      <v-card>
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center">
+          <v-icon class="mr-2">mdi-account-group</v-icon>
+          Chọn khách hàng
+        </v-card-title>
+        <v-card-text>
+          <v-row class="mb-3">
+            <v-col cols="12" md="6">
+              <v-text-field v-model="customerSearch" placeholder="Tìm theo tên/email/số điện thoại" density="compact" variant="outlined" prepend-inner-icon="mdi-magnify" @input="filterCustomerList"></v-text-field>
+            </v-col>
+          </v-row>
+          <v-data-table :headers="customerHeaders" :items="filteredCustomers" :items-per-page="8" class="elevation-0">
+            <template #item.hanhDong="{ item }">
+              <v-btn color="success" size="small" variant="elevated" class="action-btn" @click="chooseCustomer(item)">
+                <v-icon size="small" class="mr-1">mdi-check</v-icon>
+                Chọn
+              </v-btn>
+            </template>
+          </v-data-table>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="elevated" class="action-btn" @click="showCustomerModal = false">Đóng</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Dialog thêm khách hàng nhanh -->
+    <v-dialog v-model="showQuickAddModal" max-width="600px">
+      <v-card>
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center">
+          <v-icon class="mr-2">mdi-account-plus</v-icon>
+          Thêm khách hàng nhanh
+        </v-card-title>
+        <v-card-text>
+          <v-row>
+            <v-col cols="12">
+              <v-text-field v-model="quickCustomer.hoTen" label="Họ và tên" variant="outlined" density="compact"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field v-model="quickCustomer.soDienThoai" label="Số điện thoại" variant="outlined" density="compact"></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field v-model="quickCustomer.email" label="Email (tuỳ chọn)" variant="outlined" density="compact"></v-text-field>
+            </v-col>
+          </v-row>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="elevated" class="action-btn" @click="showQuickAddModal = false">Huỷ</v-btn>
+          <v-btn color="success" variant="elevated" class="action-btn" @click="saveQuickCustomer">Lưu</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
   
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import khachHangApi from '@/api/khachHangApi'
 
 const generateOrderId = () => {
   return 'ORD' + Date.now().toString().slice(-6)
 }
 
 const orderId = ref(generateOrderId())
+const orderStarted = ref(false)
 const isDelivery = ref(false)
 const discountCode = ref('')
 const paymentMethod = ref<'cash' | 'bank'>('cash')
@@ -330,6 +412,17 @@ const allProducts = ref([
 ])
 
 const searchResults = ref<any[]>([])
+
+// Khách hàng
+const showCustomerModal = ref(false)
+const customers = ref<any[]>([])
+const filteredCustomers = ref<any[]>([])
+const customerSearch = ref('')
+const selectedCustomer = ref<any | null>(null)
+
+// Quick add customer
+const showQuickAddModal = ref(false)
+const quickCustomer = ref<{ hoTen: string; soDienThoai: string; email?: string }>({ hoTen: '', soDienThoai: '', email: '' })
 
 const provinces = ref<any[]>([])
 const districts = ref<any[]>([])
@@ -396,6 +489,14 @@ const productModalHeaders = [
   { title: 'Giá bán', key: 'giaBan', sortable: false, width: '120px' },
   { title: 'Tồn kho', key: 'tonKho', sortable: false, width: '100px' },
   { title: 'Thao tác', key: 'thaoTac', sortable: false, width: '100px' }
+]
+
+const customerHeaders = [
+  { title: 'STT', key: 'stt', sortable: false, width: '60px' },
+  { title: 'Họ và tên', key: 'hoTen', sortable: false },
+  { title: 'Email', key: 'email', sortable: false },
+  { title: 'Số điện thoại', key: 'soDienThoai', sortable: false, width: '140px' },
+  { title: 'Hành động', key: 'hanhDong', sortable: false, width: '120px' }
 ]
 
 const detailAddressRules = [
@@ -505,6 +606,77 @@ const searchProducts = () => {
     )
   } else {
     searchResults.value = []
+  }
+}
+
+// Dialog khách hàng
+const openCustomerDialog = async () => {
+  showCustomerModal.value = true
+  if (customers.value.length === 0) {
+    await fetchCustomers()
+  }
+  filteredCustomers.value = [...customers.value]
+}
+
+const fetchCustomers = async () => {
+  try {
+    customers.value = await khachHangApi.hienThi()
+  } catch (e) {
+    customers.value = []
+  }
+}
+
+const filterCustomerList = () => {
+  const kw = customerSearch.value.trim().toLowerCase()
+  if (!kw) {
+    filteredCustomers.value = [...customers.value]
+    return
+  }
+  filteredCustomers.value = customers.value.filter((c: any) =>
+    (c.hoTen && c.hoTen.toLowerCase().includes(kw)) ||
+    (c.email && c.email.toLowerCase().includes(kw)) ||
+    (c.soDienThoai && String(c.soDienThoai).includes(kw))
+  )
+}
+
+const chooseCustomer = (cus: any) => {
+  selectedCustomer.value = cus
+  customerInfo.value.ten = cus.hoTen || ''
+  customerInfo.value.sdt = String(cus.soDienThoai || '')
+  showCustomerModal.value = false
+}
+
+const openQuickAddCustomer = () => {
+  quickCustomer.value = { hoTen: '', soDienThoai: '', email: '' }
+  showQuickAddModal.value = true
+}
+
+const saveQuickCustomer = async () => {
+  const payload: any = {
+    hoTen: quickCustomer.value.hoTen?.trim(),
+    soDienThoai: String(quickCustomer.value.soDienThoai || '').trim(),
+    email: quickCustomer.value.email?.trim() || ''
+  }
+  if (!payload.hoTen || !payload.soDienThoai) {
+    alert('Vui lòng nhập Họ tên và Số điện thoại')
+    return
+  }
+  try {
+    const created = await khachHangApi.themNhanh(payload)
+    // thêm vào danh sách hiện tại để lần sau tìm nhanh
+    customers.value.unshift(created)
+    selectedCustomer.value = created
+    customerInfo.value.ten = created.hoTen || ''
+    customerInfo.value.sdt = String(created.soDienThoai || '')
+    showQuickAddModal.value = false
+  } catch (e) {
+    // fallback: thêm local nếu API chưa có
+    const local = { id: Date.now(), ...payload }
+    customers.value.unshift(local)
+    selectedCustomer.value = local
+    customerInfo.value.ten = local.hoTen
+    customerInfo.value.sdt = local.soDienThoai
+    showQuickAddModal.value = false
   }
 }
 
@@ -677,6 +849,17 @@ const resetForm = () => {
   paymentMethod.value = 'cash'
   orderId.value = generateOrderId()
   cartItemId = 1
+  selectedCustomer.value = null
+  orderStarted.value = false
+}
+
+const startNewOrder = () => {
+  resetForm()
+  orderStarted.value = true
+}
+
+const cancelOrder = () => {
+  resetForm()
 }
 
 onMounted(async () => {
